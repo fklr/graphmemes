@@ -164,6 +164,23 @@ impl<'a> GraphemeIterator<'a> {
 
     /// Processes a single character, potentially producing a complete grapheme.
     ///
+    /// This function implements a state machine that handles:
+    /// - Fast path for standalone ASCII characters
+    /// - ANSI escape sequences
+    /// - Complex grapheme clusters
+    ///
+    /// The state transitions are:
+    /// ```text
+    /// STATE_START     -> STATE_IN_GRAPHEME  (on char accumulation)
+    ///                 -> STATE_IN_ANSI      (on ANSI escape)
+    /// STATE_IN_ANSI   -> STATE_START        (on ANSI terminator)
+    /// STATE_IN_GRAPHEME -> STATE_IN_GRAPHEME (continuing cluster)
+    ///                   -> STATE_START      (on boundary)
+    /// ```
+    ///
+    /// The ASCII fast path optimizes single-character graphemes while maintaining
+    /// proper boundary detection for sequences.
+    ///
     /// # Arguments
     ///
     /// * `c` - The character to process
@@ -172,13 +189,37 @@ impl<'a> GraphemeIterator<'a> {
     ///
     /// * `Ok(Some(grapheme))` - A complete grapheme was formed
     /// * `Ok(None)` - Character was processed but no complete grapheme yet
-    /// * `Err(error)` - An error occurred during processing
+    /// * `Err(error)` - An error occurred during processing:
+    ///   - `GraphemeError::BufferOverflow` if cluster exceeds `MAX_GRAPHEME_SIZE`
+    ///   - `GraphemeError::InvalidAnsiSequence` for malformed ANSI sequences
     #[inline]
     fn process_char(&mut self, c: char) -> Result<Option<Grapheme>> {
         let current_pos = self.position;
         self.position += c.len_utf8();
 
         match (c, self.state()) {
+            // ASCII fast path - but only for definite boundaries
+            (c, STATE_START) if c.is_ascii() && c != '\x1b' => {
+                // Handle buffer state
+                if self.buffer_len >= MAX_GRAPHEME_SIZE {
+                    return Err(GraphemeError::buffer_overflow(current_pos, c.len_utf8()));
+                }
+
+                self.buffer[self.buffer_len] = c;
+                self.buffer_len += 1;
+
+                // Continue with normal boundary detection
+                if self.buffer_len == 1 {
+                    self.set_state(STATE_IN_GRAPHEME);
+                    Ok(None)
+                } else {
+                    let grapheme = Grapheme::new(self.buffer, self.buffer_len - 1);
+                    self.buffer[0] = self.buffer[self.buffer_len - 1];
+                    self.buffer_len = 1;
+                    self.set_state(STATE_IN_GRAPHEME);
+                    Ok(Some(grapheme))
+                }
+            }
             ('\x1b', _) => {
                 if self.buffer_len > 0 {
                     let grapheme = Grapheme::new(self.buffer, self.buffer_len);
