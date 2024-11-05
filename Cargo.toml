@@ -2,5 +2,29 @@
 name = "graphmemes"
 version = "0.1.0"
 edition = "2021"
+description = "Zero-allocation grapheme cluster iterator"
+license = "MPL-2.0"
 
 [dependencies]
+owo-colors = "4.1.0"
+
+[dev-dependencies]
+heapless = "0.8.0"
+unicode-segmentation = "1.10.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = false
+
+[profile.bench]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[[bench]]
+name = "performance"
+harness = false
+
