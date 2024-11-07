@@ -28,3 +28,6 @@ debug = true
 name = "performance"
 harness = false
 
+[[bench]]
+name = "chars"
+harness = false
