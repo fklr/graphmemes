@@ -1,0 +1,24 @@
+[package]
+name = "graphmemes-fuzz"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.7"
+
+[dependencies.graphmemes]
+path = ".."
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "graphemes"
+path = "fuzz_targets/graphemes.rs"
+test = false
+doc = false
+bench = false

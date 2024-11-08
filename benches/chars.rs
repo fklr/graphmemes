@@ -44,7 +44,7 @@ fn slower() -> Box<dyn Display> {
 }
 
 fn test_performance(name: &str, content: &str) {
-    let iterations = 100;
+    let iterations = 20000;
 
     // Warmup
     for _ in 0..5 {
